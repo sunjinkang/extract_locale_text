@@ -1,0 +1,12 @@
+C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\data.txt
+line 3: 标题
+line 7: 操作
+
+C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.html
+line 10: 姓名
+line 11: 年龄
+
+C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.js
+line 2: 测试用的文件
+line 4: 男
+line 5: 读书、旅游

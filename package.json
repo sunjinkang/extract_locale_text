@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "miss-locale": "node ./filter_project_locale/getFilePath.js"
+    "miss-locale": "node ./project/scripts/getFilePath.js"
   },
   "name": "extract_locale_text",
   "version": "1.0.0",

@@ -1,0 +1,10 @@
+[
+ {
+ title: '标题',
+ key: 'title',
+},
+{
+ title: '操作',
+ key: 'operate',
+}
+]

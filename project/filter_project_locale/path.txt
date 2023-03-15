@@ -1,6 +1,0 @@
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_locale_miss
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\getFilePath.js
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\path.txt
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\public
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\public\tool.js

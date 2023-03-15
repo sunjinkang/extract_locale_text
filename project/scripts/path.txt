@@ -1,0 +1,3 @@
+C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\data.txt
+C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.html
+C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.js
