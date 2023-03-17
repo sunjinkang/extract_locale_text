@@ -3,8 +3,9 @@ line 3: 标题
 line 7: 操作
 
 C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.html
-line 10: 姓名
-line 11: 年龄
+line 10: 这是注释
+line 11: 姓名、孙
+line 12: 年龄
 
 C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.js
 line 2: 测试用的文件
