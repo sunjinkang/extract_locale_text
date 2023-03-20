@@ -56,7 +56,10 @@ fileArr.forEach((fileName) => {
     const lineFile = fs.readFileSync(fileName, 'utf8');
     const arr = lineFile.split(/\r?\n/);
     arr.forEach((line, index) => {
-      var match = line.match(/[\u4e00-\u9faf]+/g);
+      var match =
+        !line.includes('//') && !line.includes('<!--') && !line.includes('*')
+          ? line.match(/[\u4e00-\u9faf]+/g)
+          : '';
       if (!!match) {
         const localeContent = fs.existsSync(localeFile)
           ? fs.readFileSync(localeFile, 'utf8')
