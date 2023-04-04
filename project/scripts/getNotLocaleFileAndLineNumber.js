@@ -4,6 +4,20 @@ const process = require('process');
 const traverse = require('@babel/traverse');
 const parser = require('@babel/parser');
 
+const filterDirectory = [
+  'api',
+  'api-oceanBase',
+  'locale',
+  'store',
+  'styles',
+  'theme',
+  'typing',
+];
+
+for (let i = 0; i < filterDirectory.length; i++) {
+  filterDirectory[i] = path.resolve(__dirname, `../src/${filterDirectory[i]}`);
+}
+
 const getDirAllFile = (dir) => {
   const allFile = [];
   getFilePath(dir, allFile);
@@ -15,21 +29,27 @@ const getFilePath = (dir, allFile) => {
   dirFiles.forEach((item) => {
     const filePath = path.join(dir, item);
     const current = fs.statSync(filePath);
-    if (current.isDirectory() === true) {
-      allFile.push(filePath);
+    if (current.isDirectory() === true && !filterDirectory.includes(filePath)) {
       getFilePath(filePath, allFile);
     }
-    if (current.isFile() === true) {
+    if (
+      current.isFile() === true &&
+      !(
+        filePath.endsWith('.test.tsx') ||
+        filePath.endsWith('.d.ts') ||
+        filePath.endsWith('.type.ts') ||
+        filePath.endsWith('.enum.ts') ||
+        filePath.endsWith('.less') ||
+        filePath.endsWith('.d.tsx')
+      )
+    ) {
       allFile.push(filePath);
     }
   });
 };
 
-const currentDir = path.resolve(
-  __dirname,
-  '../../project/filter_project_locale'
-);
-const storeDir = path.resolve(__dirname, '../../project/scripts');
+const currentDir = path.resolve(__dirname, '../src');
+const storeDir = path.resolve(__dirname, './');
 
 const allFiles = getDirAllFile(currentDir);
 
@@ -51,7 +71,29 @@ for (const key of fileSet) {
 fs.appendFileSync(pathFile, allFiles.join('\n'));
 
 const detectChinese = (text) => {
-  return /[\u4e00-\u9fa5]/.test(text);
+  return /[\u4e00-\u9fa5]/.test(text) && !text.includes('.html');
+};
+
+const detectRepetition = (content) => {
+  const fileContent = fs.existsSync(localeFile)
+    ? fs.readFileSync(localeFile).toString()
+    : '';
+  return !fileContent.includes(content);
+};
+
+const commonFetText = (pa, fileName) => {
+  const testName = detectChinese(pa.node.key?.name ?? '');
+  const testValue = detectChinese(pa.node.value?.value ?? '');
+  const infoName = testName
+    ? `${fileName}\nline: ${pa.node.loc.start.line}-${pa.node.key?.name}\n\n`
+    : '';
+  const infoValue = testValue
+    ? `${fileName}\nline: ${pa.node.loc.start.line}-${pa.node.value.value}\n\n`
+    : '';
+  const isNotSame = detectRepetition(infoName || infoValue);
+  if ((infoName || infoValue) && isNotSame) {
+    fs.appendFileSync(localeFile, infoName || infoValue);
+  }
 };
 
 const file = fs.readFileSync(pathFile, 'utf8');
@@ -59,23 +101,30 @@ const fileArr = file.split(/\r?\n/);
 fileArr.forEach((fileName) => {
   const current = fs.statSync(fileName);
   if (current.isFile() === true) {
+    if (!fileName.endsWith('.tsx') && !fileName.endsWith('.jsx')) {
+      return;
+    }
     const lineFile = fs.readFileSync(fileName).toString();
 
     const code = parser.parse(lineFile, {
       sourceType: 'module',
-      // plugins: ['json', 'html', 'js'],
       plugins: ['jsx', 'typescript', 'decorators-legacy', 'syntax-import-meta'],
     });
     traverse.default(code, {
       Property(pa) {
-        console.log(pa.node.key);
-        console.log(pa.node.value);
-        const test = detectChinese(pa.node.key.name || pa.node.value.value);
-        if (test) {
-          const info = `${pa.node.key.name || pa.node.value.value}\nline: ${
-            pa.node.loc.start.line
-          }`;
-          fs.appendFileSync(localeFile, info);
+        commonFetText(pa, fileName);
+      },
+      JSXAttribute(pa) {
+        commonFetText(pa, fileName);
+      },
+      StringLiteral(pa) {
+        const testValue = detectChinese(pa.node.value ?? '');
+        const infoValue = testValue
+          ? `${fileName}\nline: ${pa.node.loc.start.line}-${pa.node.value}\n\n`
+          : '';
+        const isNotSame = detectRepetition(infoValue);
+        if (infoValue && isNotSame) {
+          fs.appendFileSync(localeFile, infoValue);
         }
       },
     });
