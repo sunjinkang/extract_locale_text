@@ -1,3 +1,6 @@
+// "miss-locale-file": "cross-env outPutType=file node ./project/scripts/getNotLocaleFileAndLineNumber.js",
+// "miss-locale-terminal": "cross-env outPutType=terminal node ./project/scripts/getNotLocaleFileAndLineNumber.js"
+
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
@@ -14,9 +17,9 @@ const filterDirectory = [
   'typing',
 ];
 
-for (let i = 0; i < filterDirectory.length; i++) {
-  filterDirectory[i] = path.resolve(__dirname, `../src/${filterDirectory[i]}`);
-}
+// for (let i = 0; i < filterDirectory.length; i++) {
+//   filterDirectory[i] = path.resolve(__dirname, `../src/${filterDirectory[i]}`);
+// }
 
 const getDirAllFile = (dir) => {
   const allFile = [];
@@ -48,7 +51,8 @@ const getFilePath = (dir, allFile) => {
   });
 };
 
-const currentDir = path.resolve(__dirname, '../src');
+const currentDir = path.resolve(__dirname, '../filter_project_locale');
+// const currentDir = path.resolve(__dirname, '../src');
 const storeDir = path.resolve(__dirname, './');
 
 const allFiles = getDirAllFile(currentDir);
@@ -92,7 +96,14 @@ const commonFetText = (pa, fileName) => {
     : '';
   const isNotSame = detectRepetition(infoName || infoValue);
   if ((infoName || infoValue) && isNotSame) {
-    fs.appendFileSync(localeFile, infoName || infoValue);
+    outPutLocaleResult(localeFile, infoName || infoValue);
+  }
+};
+
+const outPutLocaleResult = (fileName, content) => {
+  fs.appendFileSync(fileName, content);
+  if (process.env.outPutType !== 'file') {
+    console.log(content);
   }
 };
 
@@ -124,31 +135,9 @@ fileArr.forEach((fileName) => {
           : '';
         const isNotSame = detectRepetition(infoValue);
         if (infoValue && isNotSame) {
-          fs.appendFileSync(localeFile, infoValue);
+          outPutLocaleResult(localeFile, infoValue);
         }
       },
     });
-
-    // const arr = lineFile.split(/\r?\n/);
-    // arr.forEach((line, index) => {
-    //   var match =
-    //     !line.includes('//') && !line.includes('<!--') && !line.includes('*')
-    //       ? line.match(/[\u4e00-\u9faf]+/g)
-    //       : '';
-    //   if (!!match) {
-    //     const localeContent = fs.existsSync(localeFile)
-    //       ? fs.readFileSync(localeFile)
-    //       : '';
-    //     let data = '';
-    //     if (localeContent.includes(fileName)) {
-    //       data = `\nline ${index + 1}: ${match.join('、')}`;
-    //     } else {
-    //       data = `${fs.existsSync(localeFile) ? '\n\n' : ''}${fileName}\nline ${
-    //         index + 1
-    //       }: ${match.join('、')}`;
-    //     }
-    //     fs.appendFileSync(localeFile, data);
-    //   }
-    // });
   }
 });

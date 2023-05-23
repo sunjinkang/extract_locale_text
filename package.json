@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "miss-locale": "node ./project/scripts/getNotLocaleFileAndLineNumber.js"
+    "miss-locale-file": "cross-env outPutType=file node ./project/scripts/getNotLocaleFileAndLineNumber.js",
+    "miss-locale-terminal": "cross-env outPutType=terminal node ./project/scripts/getNotLocaleFileAndLineNumber.js",
+    "check-locale-valid": "node ./project/scripts/checkLocaleValid.js"
   },
   "name": "extract_locale_text",
   "version": "1.0.0",
@@ -10,6 +12,7 @@
   "license": "MIT",
   "dependencies": {
     "@babel/parser": "^7.21.3",
-    "@babel/traverse": "^7.21.3"
+    "@babel/traverse": "^7.21.3",
+    "cross-env": "^7.0.3"
   }
 }
