@@ -100,6 +100,7 @@ const commonFetText = (pa, fileName) => {
   }
 };
 
+// 使用输出命令时，不要使用文件，使用内容，每次换文件时，清空内存
 const outPutLocaleResult = (fileName, content) => {
   fs.appendFileSync(fileName, content);
   if (process.env.outPutType !== 'file') {
