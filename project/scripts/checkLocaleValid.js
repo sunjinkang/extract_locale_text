@@ -1,47 +1,185 @@
 const fs = require('fs');
 const path = require('path');
-const traverse = require('@babel/traverse');
 const parser = require('@babel/parser');
+const traverse = require('@babel/traverse');
 
-const localePath =
-  'diagnosis.diagnosisReport.reportContent.highlyAvailableConfiguration.uguardStatus.statusDisabled';
+const bashFileName = {
+  User: 'User_bash',
+  UrmanTask: 'UrmanTask_bash',
+  UrmanResource: 'UrmanResource_bash',
+  UrmanDataRecovery: 'UrmanDataRecovery_bash',
+  UproxyRouter: 'UproxyRouter_bash',
+  Tag: 'Tag_bash',
+  Sla: 'Sla_bash',
+  SipPool: 'SipPool_bash',
+  Server: 'Server_bash',
+  Mysql: 'Mysql_bash',
+  License: 'License_bash',
+  Layout: 'Layout_bash',
+  Diagnosis: 'Diagnosis_bash',
+  publicLang: 'public',
+  index: 'index_bash',
+  Progress: 'Progress_bash',
+  Button: 'Button_bash',
+};
 
-const localePathParams = localePath.split('.');
-const fileName = `${localePathParams[0]}.ts`;
-const localeFilePath = path.resolve(__dirname, `../locale/${fileName}`);
-const parentKey = localePathParams[localePathParams.length - 2];
-const currentKey = localePathParams[localePathParams.length - 1];
+const keysData = {};
 
-const checkLocaleValid = () => {
-  const fileContent = fs.existsSync(localeFilePath)
-    ? fs.readFileSync(localeFilePath).toString()
-    : '';
+// 依据语言包文件名获取对应文件中所有的语言包key，并保存在keysData中
+// 注意：
+// 1.由于同一个文件中，有时会引用不同的语言包文件，可能会出现keysData中同时需要保存多个文件key的情况
+// 2.当查找的文件切换时，需要清空keysData
+const getFileLocaleDataByFileName = (fileName, languagePrefix = 'ch') => {
+  const testFile = path.resolve(
+    __dirname,
+    `../src/locale/${languagePrefix}-language/${fileName}.ts`
+  );
+
+  const fileContent = fs.readFileSync(testFile).toString();
+
+  const getFileName = () => {
+    const tempName = path.basename(testFile, '.ts');
+    return Object.keys(bashFileName).includes(tempName)
+      ? bashFileName[tempName]
+      : tempName;
+  };
+  const currentFileName = getFileName();
+
   const code = parser.parse(fileContent, {
     sourceType: 'module',
-    plugins: ['typescript', 'decorators-legacy', 'syntax-import-meta'],
   });
+
+  const getAllParentPath = (path, pathArray) => {
+    const key = path.node.key?.name
+      ? path.node.key?.name
+      : path.node.key?.value;
+    if (path.node.type !== 'ExportDefaultDeclaration') {
+      if (key) {
+        pathArray.unshift(key);
+      }
+      getAllParentPath(path.parentPath, pathArray);
+    } else {
+      return;
+    }
+  };
+
   traverse.default(code, {
-    ObjectProperty(pa) {
-      if (pa.node.key.name === parentKey) {
-        const children = pa.node.value.properties;
-        if (Array.isArray(children) && children.length) {
-          const hasCurrentKey = !!children.find(
-            (item) => item.key.name === currentKey
-          );
-          if (!hasCurrentKey) console.log(localePath);
-        }
+    Property(pa) {
+      if (pa.node.value.type === 'StringLiteral') {
+        const currentKey = `${pa.node.loc?.start?.line}-${pa.node.key.name}`;
+        keysData[currentKey] = [];
+      }
+    },
+    Identifier(pa) {
+      const currentKey = `${pa.node.loc?.start?.line}-${pa.node.name}`;
+      if (Object.keys(keysData).includes(currentKey)) {
+        getAllParentPath(pa, keysData[currentKey]);
+        keysData[currentKey].unshift(currentFileName);
+        keysData[currentKey] = keysData[currentKey].join('.');
       }
     },
   });
 };
 
-checkLocaleValid();
+// getFileLocaleDataByFileName('common');
+// console.log(keysData);
 
-// 待解决难点：
-// 1、怎么从代码里面找语言的路径代码？
+const getAllFilePath = () => {
+  const filterDirectory = [
+    'api',
+    'api-oceanBase',
+    'locale',
+    'store',
+    'styles',
+    'theme',
+    'typing',
+  ];
 
-// 2、有一些是模板字符串的路径怎么处理？
-// 代码执行的时候，直接打印输出，手动处理
+  for (let i = 0; i < filterDirectory.length; i++) {
+    filterDirectory[i] = path.resolve(
+      __dirname,
+      `../src/${filterDirectory[i]}`
+    );
+  }
 
-// 3、只使用最后两个key进行校验是否不严谨？
-// 强烈不建议只使用最后两个key，可以先遍历语言包文件，获取所有的key，然后再将代码中的key与所有的key进行比较，查看代码中的key在语言包中是否存在对应文字
+  const getDirAllFile = (dir) => {
+    const allFile = [];
+    getFilePath(dir, allFile);
+    return allFile;
+  };
+
+  const getFilePath = (dir, allFile) => {
+    const dirFiles = fs.readdirSync(dir);
+    dirFiles.forEach((item) => {
+      const filePath = path.join(dir, item);
+      const current = fs.statSync(filePath);
+      if (
+        current.isDirectory() === true &&
+        !filterDirectory.includes(filePath)
+      ) {
+        getFilePath(filePath, allFile);
+      }
+      if (
+        current.isFile() === true &&
+        !(
+          filePath.endsWith('.test.tsx') ||
+          filePath.endsWith('.d.ts') ||
+          filePath.endsWith('.type.ts') ||
+          filePath.endsWith('.enum.ts') ||
+          filePath.endsWith('.less') ||
+          filePath.endsWith('.d.tsx')
+        )
+      ) {
+        allFile.push(filePath);
+      }
+    });
+  };
+
+  const currentDir = path.resolve(__dirname, '../src');
+  const storeDir = path.resolve(__dirname, './');
+
+  const allFiles = getDirAllFile(currentDir);
+
+  const pathFile = path.resolve(storeDir, './path.txt');
+
+  if (fs.existsSync(pathFile)) {
+    try {
+      fs.rmSync(key);
+    } catch (rmError) {
+      console.error(`删除文件失败:${rmError}`);
+      process.exit(1);
+    }
+  }
+  fs.appendFileSync(pathFile, allFiles.join('\n'));
+
+  const file = fs.readFileSync(pathFile, 'utf8');
+  const fileArr = file.split(/\r?\n/);
+  fileArr.forEach((fileName) => {
+    const current = fs.statSync(fileName);
+    if (current.isFile() === true) {
+      const lineFile = fs.readFileSync(fileName).toString();
+      const code = parser.parse(lineFile, {
+        sourceType: 'module',
+        plugins: [
+          'jsx',
+          'typescript',
+          'decorators-legacy',
+          'syntax-import-meta',
+        ],
+      });
+      traverse.default(code, {
+        Property(pa) {
+          console.log(pa);
+        },
+        JSXAttribute(pa) {
+          console.log(pa);
+        },
+        StringLiteral(pa) {
+          console.log(pa);
+        },
+      });
+    }
+  });
+};
+
+getAllFilePath();

@@ -62,6 +62,9 @@ const localeFile = path.resolve(storeDir, './locale.txt');
 
 const fileSet = [pathFile, localeFile];
 
+// save file locale key data to filter repeat locale data
+const localeKeyData = new Map();
+
 for (const key of fileSet) {
   if (fs.existsSync(key)) {
     try {
@@ -78,11 +81,13 @@ const detectChinese = (text) => {
   return /[\u4e00-\u9fa5]/.test(text) && !text.includes('.html');
 };
 
-const detectRepetition = (content) => {
-  const fileContent = fs.existsSync(localeFile)
-    ? fs.readFileSync(localeFile).toString()
-    : '';
-  return !fileContent.includes(content);
+// 将当前文件的中文语言包的key保存在内存中，判断是否已发现时从内存中获取，每次换文件时，清空内存
+const detectRepetition = (key, content) => {
+  if (localeKeyData.has(key)) {
+    return false;
+  }
+  localeKeyData.set(key, content);
+  return true;
 };
 
 const commonFetText = (pa, fileName) => {
@@ -91,20 +96,29 @@ const commonFetText = (pa, fileName) => {
   const infoName = testName
     ? `${fileName}\nline: ${pa.node.loc.start.line}-${pa.node.key?.name}\n\n`
     : '';
+  const infoNameKey = testName
+    ? `${fileName}-${pa.node.loc.start.line}-${pa.node.key?.name}`
+    : '';
   const infoValue = testValue
     ? `${fileName}\nline: ${pa.node.loc.start.line}-${pa.node.value.value}\n\n`
     : '';
-  const isNotSame = detectRepetition(infoName || infoValue);
+  const infoValueKey = testValue
+    ? `${fileName}-${pa.node.loc.start.line}-${pa.node.value.value}`
+    : '';
+  const isNotSame = detectRepetition(
+    infoNameKey || infoValueKey,
+    infoName || infoValue
+  );
   if ((infoName || infoValue) && isNotSame) {
     outPutLocaleResult(localeFile, infoName || infoValue);
   }
 };
 
-// 使用输出命令时，不要使用文件，使用内容，每次换文件时，清空内存
 const outPutLocaleResult = (fileName, content) => {
-  fs.appendFileSync(fileName, content);
   if (process.env.outPutType !== 'file') {
     console.log(content);
+  } else {
+    fs.appendFileSync(fileName, content);
   }
 };
 
@@ -113,14 +127,20 @@ const fileArr = file.split(/\r?\n/);
 fileArr.forEach((fileName) => {
   const current = fs.statSync(fileName);
   if (current.isFile() === true) {
-    if (!fileName.endsWith('.tsx') && !fileName.endsWith('.jsx')) {
-      return;
-    }
+    localeKeyData.clear();
     const lineFile = fs.readFileSync(fileName).toString();
-
     const code = parser.parse(lineFile, {
       sourceType: 'module',
-      plugins: ['jsx', 'typescript', 'decorators-legacy', 'syntax-import-meta'],
+      plugins: [
+        // 支持jsx语法
+        'jsx',
+        // 支持typescript
+        'typescript',
+        // 修饰符
+        'decorators-legacy',
+        // 支持使用import.meta
+        'syntax-import-meta',
+      ],
     });
     traverse.default(code, {
       Property(pa) {
@@ -134,7 +154,10 @@ fileArr.forEach((fileName) => {
         const infoValue = testValue
           ? `${fileName}\nline: ${pa.node.loc.start.line}-${pa.node.value}\n\n`
           : '';
-        const isNotSame = detectRepetition(infoValue);
+        const infoValueKey = testValue
+          ? `${fileName}-${pa.node.loc.start.line}-${pa.node.value}`
+          : '';
+        const isNotSame = detectRepetition(infoValueKey, infoValue);
         if (infoValue && isNotSame) {
           outPutLocaleResult(localeFile, infoValue);
         }
