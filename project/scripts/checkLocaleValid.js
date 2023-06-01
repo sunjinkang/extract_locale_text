@@ -23,36 +23,34 @@ const bashFileName = {
   Button: 'Button_bash',
 };
 
-const keysData = {};
+let keysData = {};
+let nameKeys = [];
 
 // 依据语言包文件名获取对应文件中所有的语言包key，并保存在keysData中
 // 注意：
 // 1.由于同一个文件中，有时会引用不同的语言包文件，可能会出现keysData中同时需要保存多个文件key的情况
 // 2.当查找的文件切换时，需要清空keysData
 const getFileLocaleDataByFileName = (fileName, languagePrefix = 'ch') => {
+  const aliasName = Object.keys(bashFileName).includes(fileName)
+    ? bashFileName[fileName]
+    : fileName;
   const testFile = path.resolve(
     __dirname,
-    `../src/locale/${languagePrefix}-language/${fileName}.ts`
+    `../src/locale/${languagePrefix}-language/${aliasName}.ts`
   );
 
   const fileContent = fs.readFileSync(testFile).toString();
-
-  const getFileName = () => {
-    const tempName = path.basename(testFile, '.ts');
-    return Object.keys(bashFileName).includes(tempName)
-      ? bashFileName[tempName]
-      : tempName;
-  };
-  const currentFileName = getFileName();
 
   const code = parser.parse(fileContent, {
     sourceType: 'module',
   });
 
   const getAllParentPath = (path, pathArray) => {
-    const key = path.node.key?.name
-      ? path.node.key?.name
-      : path.node.key?.value;
+    let key = path.node.key?.name ? path.node.key?.name : path.node.key?.value;
+    // 部分语言包中存在数组结构数据
+    if (!!key && path?.parentPath?.parentPath?.type === 'ArrayExpression') {
+      key = `${path?.parentPath?.key}.${key}`;
+    }
     if (path.node.type !== 'ExportDefaultDeclaration') {
       if (key) {
         pathArray.unshift(key);
@@ -63,26 +61,55 @@ const getFileLocaleDataByFileName = (fileName, languagePrefix = 'ch') => {
     }
   };
 
+  const getKeysData = (pa, currentKey, name) => {
+    if (Object.keys(keysData).includes(currentKey)) {
+      getAllParentPath(pa, keysData[currentKey]);
+      keysData[currentKey].unshift(name);
+      keysData[currentKey] = keysData[currentKey].join('.');
+    }
+  };
+
   traverse.default(code, {
     Property(pa) {
-      if (pa.node.value.type === 'StringLiteral') {
+      if (pa.node.value.type === 'StringLiteral' && pa.node.key.name) {
         const currentKey = `${pa.node.loc?.start?.line}-${pa.node.key.name}`;
         keysData[currentKey] = [];
       }
     },
+    StringLiteral(pa) {
+      const parentNodeKey = pa?.parentPath?.node?.key;
+      if (
+        parentNodeKey?.value &&
+        pa.parentPath?.parentPath.parentPath.node.type ===
+          'ExportDefaultDeclaration'
+      ) {
+        const currentKey = `${parentNodeKey?.loc?.start?.line}-${parentNodeKey?.value}`;
+        keysData[currentKey] = [];
+        getKeysData(pa, currentKey, fileName);
+      }
+    },
     Identifier(pa) {
-      const currentKey = `${pa.node.loc?.start?.line}-${pa.node.name}`;
-      if (Object.keys(keysData).includes(currentKey)) {
-        getAllParentPath(pa, keysData[currentKey]);
-        keysData[currentKey].unshift(currentFileName);
-        keysData[currentKey] = keysData[currentKey].join('.');
+      const childrenNode = pa?.parentPath?.node?.value?.properties;
+      const hasStringKeys = childrenNode?.filter(
+        (item) =>
+          item.key.type === 'StringLiteral' &&
+          item.value.type === 'StringLiteral'
+      );
+      if (hasStringKeys && hasStringKeys.length) {
+        let childrenKeys = '';
+        hasStringKeys.forEach((item) => {
+          childrenKeys = `${item?.loc?.start?.line}-${item?.key?.value}`;
+          keysData[childrenKeys] = [item?.key?.value];
+          getKeysData(pa, childrenKeys, fileName);
+        });
+      }
+      if (pa.node.name) {
+        const currentKey = `${pa.node.loc?.start?.line}-${pa.node.name}`;
+        getKeysData(pa, currentKey, fileName);
       }
     },
   });
 };
-
-// getFileLocaleDataByFileName('common');
-// console.log(keysData);
 
 const getAllFilePath = () => {
   const filterDirectory = [
@@ -127,7 +154,10 @@ const getAllFilePath = () => {
           filePath.endsWith('.type.ts') ||
           filePath.endsWith('.enum.ts') ||
           filePath.endsWith('.less') ||
-          filePath.endsWith('.d.tsx')
+          filePath.endsWith('.d.tsx') ||
+          filePath.endsWith('.stories.js') ||
+          filePath.endsWith('.md') ||
+          filePath.endsWith('.test.js')
         )
       ) {
         allFile.push(filePath);
@@ -141,13 +171,16 @@ const getAllFilePath = () => {
   const allFiles = getDirAllFile(currentDir);
 
   const pathFile = path.resolve(storeDir, './path.txt');
+  const notStringForLocale = path.resolve(storeDir, './notStringForLocale.txt');
 
-  if (fs.existsSync(pathFile)) {
-    try {
-      fs.rmSync(key);
-    } catch (rmError) {
-      console.error(`删除文件失败:${rmError}`);
-      process.exit(1);
+  for (const key of [pathFile, notStringForLocale]) {
+    if (fs.existsSync(key)) {
+      try {
+        fs.rmSync(key);
+      } catch (rmError) {
+        console.error(`删除文件失败:${rmError}`);
+        process.exit(1);
+      }
     }
   }
   fs.appendFileSync(pathFile, allFiles.join('\n'));
@@ -157,6 +190,8 @@ const getAllFilePath = () => {
   fileArr.forEach((fileName) => {
     const current = fs.statSync(fileName);
     if (current.isFile() === true) {
+      keysData = {};
+      nameKeys = [];
       const lineFile = fs.readFileSync(fileName).toString();
       const code = parser.parse(lineFile, {
         sourceType: 'module',
@@ -168,18 +203,65 @@ const getAllFilePath = () => {
         ],
       });
       traverse.default(code, {
-        Property(pa) {
-          console.log(pa);
-        },
-        JSXAttribute(pa) {
-          console.log(pa);
+        // 项目中部分语言包使用模板字符串处理key，暂无好的处理方法，将对应的位置输出到文件中，方便手动处理
+        Identifier(pa) {
+          if (pa.node.name === 't' || pa.node.name === 'translate') {
+            // 判断 t() 及 translate() 类型语言包中是否含有模板字符串
+
+            const expressionType = [
+              'MemberExpression',
+              'CallExpression',
+            ].includes(pa.parentPath.node.type);
+            const hasNotStringFirst =
+              expressionType &&
+              pa.parentPath.node.arguments?.some(
+                (item) =>
+                  item.type !== 'StringLiteral' &&
+                  item.type !== 'ObjectExpression'
+              );
+            // 判断 i18n.t() 语言包中是否含有模板字符串
+            const argumentData = pa?.parentPath?.parentPath?.node?.arguments;
+            const hasNotStringSecond =
+              pa.node.name === 't' &&
+              expressionType &&
+              argumentData?.length > 1 &&
+              argumentData?.some(
+                (item) =>
+                  item.type !== 'StringLiteral' &&
+                  item.type !== 'ObjectExpression'
+              );
+            if (!!hasNotStringFirst || !!hasNotStringSecond)
+              fs.appendFileSync(
+                notStringForLocale,
+                `${fileName}----line: ${pa.node.loc?.start?.line}\n`
+              );
+          }
         },
         StringLiteral(pa) {
-          console.log(pa);
+          const parentNode = pa?.parentPath?.node;
+          if (
+            parentNode?.type === 'CallExpression' &&
+            (parentNode?.callee?.object?.name === 'i18n' ||
+              parentNode?.callee?.property?.name === 't' ||
+              parentNode?.callee?.name === 'translate')
+          ) {
+            filterMissLocale(fileName, pa.node.value);
+          }
         },
       });
     }
   });
+};
+
+const filterMissLocale = (file, key) => {
+  const localeFileName = key?.split('.')?.[0];
+  if (!nameKeys.includes(localeFileName)) {
+    nameKeys.push(localeFileName);
+    getFileLocaleDataByFileName(localeFileName);
+  }
+  if (!Object.values(keysData).includes(key)) {
+    console.log(`${file}-----${key}`);
+  }
 };
 
 getAllFilePath();
