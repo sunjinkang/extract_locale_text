@@ -20,6 +20,7 @@ const traverse = require('@babel/traverse');
  *        (2) 格式2：t('commonGenerator.save', { name: 'nameOne' })，该格式与格式1类似，但是获取时可能无法直接获取，需要注意
  *        (3) 格式3：t(`${name}.test`)，该格式暂无法获取语言包key，直接打印输出进行手动对比处理，格式：[文件路径]: line[行号](获取对应语言包key失败)
  *        (4) 格式4：t(save)，与格式3处理相同
+ *        (5) 格式5：与以上四种格式类似，使用translate替换 t，处理方式参考对应格式
  *        PS: 通过节点名称是否为 t 获取key时，需要注意部分代码中存在 t ，举例：C:\Users\sunji\Desktop\actionCode\umc-ui\src\page\DBLEConfig\DBLEConfigV6\LogicLibrary\index.tsx
  *
  *    2、步骤3.1中，部分语言包的文件中存在特殊格式的数据结构，需要特殊处理：
@@ -27,6 +28,7 @@ const traverse = require('@babel/traverse');
  *        (2) 文件中key为中划线连接的字符串，举例：C:\Users\sunji\Desktop\actionCode\umc-ui\src\locale\ch-language\button.ts
  */
 
+// locale file alias
 const bashFileName = {
   User: 'User_bash',
   UrmanTask: 'UrmanTask_bash',
@@ -50,20 +52,25 @@ const bashFileName = {
 let keysData = {};
 let nameKeys = [];
 
-const aliasName = Object.keys(bashFileName).includes(fileName)
-  ? bashFileName[fileName]
-  : fileName;
-const testFile = path.resolve(
-  __dirname,
-  `../src/locale/${languagePrefix}-language/${aliasName}.ts`
-);
+// all need filter files directory
+const currentDir = path.resolve(__dirname, '../src');
+// store files directory
+const storeDir = path.resolve(__dirname, './');
+// locale files path file
+const pathFile = path.resolve(storeDir, './path.txt');
+const notStringForLocale = path.resolve(storeDir, './notStringForLocale.txt');
 
-const fileContent = fs.readFileSync(testFile).toString();
+const getCurrentLocaleFile = (name, filePrefix) => {
+  const aliasName = Object.keys(bashFileName).includes(name)
+    ? bashFileName[name]
+    : name;
+  return path.resolve(
+    __dirname,
+    `../src/locale/${filePrefix}-language/${aliasName}.ts`
+  );
+};
 
-const code = parser.parse(fileContent, {
-  sourceType: 'module',
-});
-
+// traverse to get node path until the export default
 const getAllParentPath = (path, pathArray) => {
   let key = path.node.key?.name ? path.node.key?.name : path.node.key?.value;
   // 部分语言包中存在数组结构数据
@@ -80,8 +87,13 @@ const getAllParentPath = (path, pathArray) => {
   }
 };
 
+// generate keysData for current locale file
 const getKeysData = (pa, currentKey, name) => {
-  if (Object.keys(keysData).includes(currentKey)) {
+  // when object has both StringLiteral type key and value will execute getKeysData multiple, so judge condition: keysData[currentKey].length === 0
+  if (
+    Object.keys(keysData).includes(currentKey) &&
+    keysData[currentKey].length === 0
+  ) {
     getAllParentPath(pa, keysData[currentKey]);
     keysData[currentKey].unshift(name);
     keysData[currentKey] = keysData[currentKey].join('.');
@@ -89,44 +101,168 @@ const getKeysData = (pa, currentKey, name) => {
 };
 
 const getFileLocaleDataByFileName = (fileName, languagePrefix = 'ch') => {
+  const testFile = getCurrentLocaleFile(fileName, languagePrefix);
+  const fileContent = fs.readFileSync(testFile).toString();
+  const code = parser.parse(fileContent, {
+    sourceType: 'module',
+  });
   traverse.default(code, {
+    // get locale keys data from locale files
     Property(pa) {
-      if (pa.node.value.type === 'StringLiteral' && pa.node.key.name) {
-        const currentKey = `${pa.node.loc?.start?.line}-${pa.node.key.name}`;
-        keysData[currentKey] = [];
-      }
-    },
-    StringLiteral(pa) {
-      const parentNodeKey = pa?.parentPath?.node?.key;
       if (
-        parentNodeKey?.value &&
-        pa.parentPath?.parentPath.parentPath.node.type ===
-          'ExportDefaultDeclaration'
+        pa.node.value.type === 'StringLiteral' &&
+        (pa.node.key.name || pa.node.key.value)
       ) {
-        const currentKey = `${parentNodeKey?.loc?.start?.line}-${parentNodeKey?.value}`;
+        const currentNodeKeyData = pa?.node?.key;
+        const currentKey = `${pa.node.loc?.start?.line}-${
+          currentNodeKeyData?.name ?? currentNodeKeyData?.value
+        }`;
         keysData[currentKey] = [];
-        getKeysData(pa, currentKey, fileName);
-      }
-    },
-    Identifier(pa) {
-      const childrenNode = pa?.parentPath?.node?.value?.properties;
-      const hasStringKeys = childrenNode?.filter(
-        (item) =>
-          item.key.type === 'StringLiteral' &&
-          item.value.type === 'StringLiteral'
-      );
-      if (hasStringKeys && hasStringKeys.length) {
-        let childrenKeys = '';
-        hasStringKeys.forEach((item) => {
-          childrenKeys = `${item?.loc?.start?.line}-${item?.key?.value}`;
-          keysData[childrenKeys] = [item?.key?.value];
-          getKeysData(pa, childrenKeys, fileName);
-        });
-      }
-      if (pa.node.name) {
-        const currentKey = `${pa.node.loc?.start?.line}-${pa.node.name}`;
         getKeysData(pa, currentKey, fileName);
       }
     },
   });
 };
+
+const getFilePath = (dir, allFile, filterDirectory) => {
+  const dirFiles = fs.readdirSync(dir);
+  dirFiles.forEach((item) => {
+    const filePath = path.join(dir, item);
+    const current = fs.statSync(filePath);
+    if (current.isDirectory() === true && !filterDirectory.includes(filePath)) {
+      getFilePath(filePath, allFile, filterDirectory);
+    }
+    if (
+      current.isFile() === true &&
+      !(
+        filePath.endsWith('.d.ts') ||
+        filePath.endsWith('.type.ts') ||
+        filePath.endsWith('.enum.ts') ||
+        filePath.endsWith('.less') ||
+        filePath.endsWith('.d.tsx') ||
+        filePath.endsWith('.md') ||
+        filePath.endsWith('.test.js')
+      )
+    ) {
+      allFile.push(filePath);
+    }
+  });
+};
+
+const getDirAllFile = (dir, filterDirectory) => {
+  const allFile = [];
+  getFilePath(dir, allFile, filterDirectory);
+  return allFile;
+};
+
+const getAllFilePath = () => {
+  const filterDirectory = [
+    'api',
+    'api-oceanBase',
+    'locale',
+    'store',
+    'styles',
+    'theme',
+    'typing',
+  ];
+
+  for (let i = 0; i < filterDirectory.length; i++) {
+    filterDirectory[i] = path.resolve(
+      __dirname,
+      `../src/${filterDirectory[i]}`
+    );
+  }
+
+  // all need filter files path data
+  const allFiles = getDirAllFile(currentDir, filterDirectory);
+
+  for (const key of [pathFile, notStringForLocale]) {
+    if (fs.existsSync(key)) {
+      try {
+        fs.rmSync(key);
+      } catch (rmError) {
+        console.error(`删除文件失败:${rmError}`);
+        process.exit(1);
+      }
+    }
+  }
+  fs.writeFileSync(pathFile, allFiles.join('\n'));
+};
+
+const filterMissLocale = (file, key) => {
+  const localeFileName = key?.split('.')?.[0];
+  if (
+    !/[\u4e00-\u9fa5]/.test(localeFileName) &&
+    !nameKeys.includes(localeFileName)
+  ) {
+    nameKeys.push(localeFileName);
+    getFileLocaleDataByFileName(localeFileName);
+  }
+  if (!Object.values(keysData).includes(key)) {
+    console.log(`${file}-----${key}`);
+  }
+};
+
+const getNodeTypeAndData = (fileName, argument = [], pa) => {
+  argument.forEach((item) => {
+    if (item?.type === 'StringLiteral') {
+      filterMissLocale(fileName, item?.value);
+    } else if (
+      item?.type === 'Identifier' ||
+      item?.type === 'TemplateLiteral' ||
+      item?.type === 'MemberExpression'
+    ) {
+      fs.appendFileSync(
+        notStringForLocale,
+        `${fileName}----line: ${pa?.node?.loc?.start?.line}\n`
+      );
+    }
+  });
+};
+
+const filterLocale = () => {
+  // getAllFilePath();
+  const file = fs.readFileSync(pathFile, 'utf8');
+  // const fileArr = file.split(/\r?\n/);
+  const fileArr = [
+    `C:\\Users\\sunji\\Desktop\\actionCode\\umc-ui\\src\\page\\Uproxy\\Instance\\components\\Modal\\components\\AddInstance.tsx`,
+  ];
+  fileArr.forEach((fileName) => {
+    const current = fs.statSync(fileName);
+    if (current.isFile() === true) {
+      keysData = {};
+      nameKeys = [];
+      const lineFile = fs.readFileSync(fileName).toString();
+      const code = parser.parse(lineFile, {
+        sourceType: 'module',
+        plugins: [
+          'jsx',
+          'typescript',
+          'decorators-legacy',
+          'syntax-import-meta',
+        ],
+      });
+      traverse.default(code, {
+        Identifier(pa) {
+          if (
+            pa?.node?.name === 't' &&
+            pa?.parentPath?.node?.type === 'MemberExpression'
+          ) {
+            const currentNodeArgument = pa?.parentPath?.parent?.arguments;
+            getNodeTypeAndData(fileName, currentNodeArgument, pa);
+          }
+          if (
+            pa.node.name === 'translate' &&
+            pa?.parentPath?.node?.type === 'CallExpression'
+          ) {
+            console.log(pa?.parentPath?.node);
+            const currentNodeArgument = pa?.parentPath?.node?.arguments;
+            getNodeTypeAndData(fileName, currentNodeArgument, pa);
+          }
+        },
+      });
+    }
+  });
+};
+
+filterLocale();
