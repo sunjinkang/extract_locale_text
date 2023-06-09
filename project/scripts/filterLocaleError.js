@@ -18,7 +18,7 @@ const traverse = require('@babel/traverse');
  *    1、步骤2.1中，获取语言包key时，由于历史原因存在多种数据格式，分别对应的举例及处理方式如下：
  *        (1) 格式1：t('commonGenerator.save')，该格式可直接获取对应语言包key
  *        (2) 格式2：t('commonGenerator.save', { name: 'nameOne' })，该格式与格式1类似，但是获取时可能无法直接获取，需要注意
- *        (3) 格式3：t(`${name}.test`)，该格式暂无法获取语言包key，直接打印输出进行手动对比处理，格式：[文件路径]: line[行号](获取对应语言包key失败)
+ *        (3) 格式3：t(`${name}.test`)，该格式暂无法获取语言包key，直接输出到文件 notStringForLocale.txt 中进行手动对比处理，格式：[文件路径]: line[行号](获取对应语言包key失败)
  *        (4) 格式4：t(save)，与格式3处理相同
  *        (5) 格式5：与以上四种格式类似，使用translate替换 t，处理方式参考对应格式
  *        PS: 通过节点名称是否为 t 获取key时，需要注意部分代码中存在 t ，举例：C:\Users\sunji\Desktop\actionCode\umc-ui\src\page\DBLEConfig\DBLEConfigV6\LogicLibrary\index.tsx
@@ -110,7 +110,8 @@ const getFileLocaleDataByFileName = (fileName, languagePrefix = 'ch') => {
     // get locale keys data from locale files
     Property(pa) {
       if (
-        pa.node.value.type === 'StringLiteral' &&
+        (pa.node.value.type === 'StringLiteral' ||
+          pa.node.value.type === 'TemplateLiteral') &&
         (pa.node.key.name || pa.node.key.value)
       ) {
         const currentNodeKeyData = pa?.node?.key;
@@ -210,7 +211,10 @@ const getNodeTypeAndData = (fileName, argument = [], pa) => {
     } else if (
       item?.type === 'Identifier' ||
       item?.type === 'TemplateLiteral' ||
-      item?.type === 'MemberExpression'
+      item?.type === 'MemberExpression' ||
+      item?.type === 'LogicalExpression' ||
+      item?.type === 'OptionalMemberExpression' ||
+      item?.type === 'BinaryExpression'
     ) {
       fs.appendFileSync(
         notStringForLocale,
@@ -221,12 +225,9 @@ const getNodeTypeAndData = (fileName, argument = [], pa) => {
 };
 
 const filterLocale = () => {
-  // getAllFilePath();
+  getAllFilePath();
   const file = fs.readFileSync(pathFile, 'utf8');
-  // const fileArr = file.split(/\r?\n/);
-  const fileArr = [
-    `C:\\Users\\sunji\\Desktop\\actionCode\\umc-ui\\src\\page\\Uproxy\\Instance\\components\\Modal\\components\\AddInstance.tsx`,
-  ];
+  const fileArr = file.split(/\r?\n/);
   fileArr.forEach((fileName) => {
     const current = fs.statSync(fileName);
     if (current.isFile() === true) {
@@ -252,10 +253,16 @@ const filterLocale = () => {
             getNodeTypeAndData(fileName, currentNodeArgument, pa);
           }
           if (
-            pa.node.name === 'translate' &&
+            (pa.node.name === 'translate' || pa.node.name === 't') &&
             pa?.parentPath?.node?.type === 'CallExpression'
           ) {
-            console.log(pa?.parentPath?.node);
+            // to filter dble LogicLibrary t param
+            if (
+              pa?.parentPath.parent.type === 'ArrowFunctionExpression' &&
+              pa.parentPath.node?.callee?.type === 'MemberExpression'
+            ) {
+              return;
+            }
             const currentNodeArgument = pa?.parentPath?.node?.arguments;
             getNodeTypeAndData(fileName, currentNodeArgument, pa);
           }
