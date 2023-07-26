@@ -2,7 +2,8 @@
   "scripts": {
     "miss-locale-file": "cross-env outPutType=file node ./project/scripts/getNotLocaleFileAndLineNumber.js",
     "miss-locale-terminal": "cross-env outPutType=terminal node ./project/scripts/getNotLocaleFileAndLineNumber.js",
-    "check-locale-valid": "node ./project/scripts/checkLocaleValid.js"
+    "check-locale-valid": "node ./project/scripts/checkLocaleValid.js",
+    "note": "node ./project/scripts/getNote.js"
   },
   "name": "extract_locale_text",
   "version": "1.0.0",
@@ -13,6 +14,10 @@
   "dependencies": {
     "@babel/parser": "^7.21.3",
     "@babel/traverse": "^7.21.3",
-    "cross-env": "^7.0.3"
+    "cheerio": "^1.0.0-rc.12",
+    "cross-env": "^7.0.3",
+    "express": "^4.18.2",
+    "iconv-lite": "^0.6.3",
+    "request": "^2.88.2"
   }
 }
