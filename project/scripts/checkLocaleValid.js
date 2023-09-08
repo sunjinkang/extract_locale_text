@@ -1,3 +1,5 @@
+// 该脚本已废弃，功能已迁移至 filterLocaleError.js
+
 const fs = require('fs');
 const path = require('path');
 const parser = require('@babel/parser');

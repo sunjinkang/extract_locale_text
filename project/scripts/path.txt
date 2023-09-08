@@ -1,2 +1,0 @@
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\index.tsx
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\test.js

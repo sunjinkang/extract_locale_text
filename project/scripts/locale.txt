@@ -1,3 +1,0 @@
-C:\Users\sunji\Desktop\learning\extract_locale_text\project\filter_project_locale\index.tsx
-line: 2-这是测试用的中文
-

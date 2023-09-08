@@ -1,61 +1,63 @@
 // "miss-locale-file": "cross-env outPutType=file node ./project/scripts/getNotLocaleFileAndLineNumber.js",
 // "miss-locale-terminal": "cross-env outPutType=terminal node ./project/scripts/getNotLocaleFileAndLineNumber.js"
 
-const fs = require('fs');
-const path = require('path');
-const process = require('process');
-const traverse = require('@babel/traverse');
-const parser = require('@babel/parser');
+// const fs = require('fs');
+// const path = require('path');
+// const process = require('process');
+// const traverse = require('@babel/traverse');
+// const parser = require('@babel/parser');
 
-const filterDirectory = [
-  'api',
-  'api-oceanBase',
-  'locale',
-  'store',
-  'styles',
-  'theme',
-  'typing',
-];
+// const filterDirectory = [
+//   'api',
+//   'api-oceanBase',
+//   'locale',
+//   'store',
+//   'styles',
+//   'theme',
+//   'typing',
+// ];
 
 // for (let i = 0; i < filterDirectory.length; i++) {
 //   filterDirectory[i] = path.resolve(__dirname, `../src/${filterDirectory[i]}`);
 // }
 
-const getDirAllFile = (dir) => {
-  const allFile = [];
-  getFilePath(dir, allFile);
-  return allFile;
-};
+// const getDirAllFile = (dir) => {
+//   const allFile = [];
+//   getFilePath(dir, allFile);
+//   return allFile;
+// };
 
-const getFilePath = (dir, allFile) => {
-  const dirFiles = fs.readdirSync(dir);
-  dirFiles.forEach((item) => {
-    const filePath = path.join(dir, item);
-    const current = fs.statSync(filePath);
-    if (current.isDirectory() === true && !filterDirectory.includes(filePath)) {
-      getFilePath(filePath, allFile);
-    }
-    if (
-      current.isFile() === true &&
-      !(
-        filePath.endsWith('.test.tsx') ||
-        filePath.endsWith('.d.ts') ||
-        filePath.endsWith('.type.ts') ||
-        filePath.endsWith('.enum.ts') ||
-        filePath.endsWith('.less') ||
-        filePath.endsWith('.d.tsx')
-      )
-    ) {
-      allFile.push(filePath);
-    }
-  });
-};
+// const getFilePath = (dir, allFile) => {
+//   const dirFiles = fs.readdirSync(dir);
+//   dirFiles.forEach((item) => {
+//     const filePath = path.join(dir, item);
+//     const current = fs.statSync(filePath);
+//     if (current.isDirectory() === true && !filterDirectory.includes(filePath)) {
+//       getFilePath(filePath, allFile);
+//     }
+//     if (
+//       current.isFile() === true &&
+//       !(
+//         filePath.endsWith('.test.tsx') ||
+//         filePath.endsWith('.d.ts') ||
+//         filePath.endsWith('.type.ts') ||
+//         filePath.endsWith('.enum.ts') ||
+//         filePath.endsWith('.less') ||
+//         filePath.endsWith('.d.tsx')
+//       )
+//     ) {
+//       allFile.push(filePath);
+//     }
+//   });
+// };
 
-const currentDir = path.resolve(__dirname, '../filter_project_locale');
 // const currentDir = path.resolve(__dirname, '../src');
-const storeDir = path.resolve(__dirname, './');
 
-const allFiles = getDirAllFile(currentDir);
+// const allFiles = getDirAllFile(currentDir);
+import { getAllFilePathUsedI18nT } from './localeCommonFunc';
+
+const allFiles = getAllFilePathUsedI18nT();
+const storeDir = path.resolve(__dirname, './');
 
 const pathFile = path.resolve(storeDir, './path.txt');
 const localeFile = path.resolve(storeDir, './locale.txt');
