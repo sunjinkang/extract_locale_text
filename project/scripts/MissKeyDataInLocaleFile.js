@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse');
+import { getAllFilePathUsedI18nT } from './localeCommonFunc';
 
 /**
  * 作用：查找代码中语言包key在语言包文件中是否缺少对应的数据
@@ -52,8 +53,6 @@ const bashFileName = {
 let keysData = {};
 let nameKeys = [];
 
-// all need filter files directory
-const currentDir = path.resolve(__dirname, '../src');
 // store files directory
 const storeDir = path.resolve(__dirname, './');
 // locale files path file
@@ -125,57 +124,9 @@ const getFileLocaleDataByFileName = (fileName, languagePrefix = 'ch') => {
   });
 };
 
-const getFilePath = (dir, allFile, filterDirectory) => {
-  const dirFiles = fs.readdirSync(dir);
-  dirFiles.forEach((item) => {
-    const filePath = path.join(dir, item);
-    const current = fs.statSync(filePath);
-    if (current.isDirectory() === true && !filterDirectory.includes(filePath)) {
-      getFilePath(filePath, allFile, filterDirectory);
-    }
-    if (
-      current.isFile() === true &&
-      !(
-        filePath.endsWith('.d.ts') ||
-        filePath.endsWith('.type.ts') ||
-        filePath.endsWith('.enum.ts') ||
-        filePath.endsWith('.less') ||
-        filePath.endsWith('.d.tsx') ||
-        filePath.endsWith('.md') ||
-        filePath.endsWith('.test.js')
-      )
-    ) {
-      allFile.push(filePath);
-    }
-  });
-};
-
-const getDirAllFile = (dir, filterDirectory) => {
-  const allFile = [];
-  getFilePath(dir, allFile, filterDirectory);
-  return allFile;
-};
-
 const getAllFilePath = () => {
-  const filterDirectory = [
-    'api',
-    'api-oceanBase',
-    'locale',
-    'store',
-    'styles',
-    'theme',
-    'typing',
-  ];
-
-  for (let i = 0; i < filterDirectory.length; i++) {
-    filterDirectory[i] = path.resolve(
-      __dirname,
-      `../src/${filterDirectory[i]}`
-    );
-  }
-
   // all need filter files path data
-  const allFiles = getDirAllFile(currentDir, filterDirectory);
+  const allFiles = getAllFilePathUsedI18nT('missKey');
 
   for (const key of [pathFile, notStringForLocale]) {
     if (fs.existsSync(key)) {

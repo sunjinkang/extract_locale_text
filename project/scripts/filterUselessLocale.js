@@ -3,25 +3,14 @@ const path = require('path');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse');
 const lodash = require('lodash');
+import { getAllFilePathUsedI18nT } from './localeCommonFunc';
+
+/**
+ * 作用：查找语言包中无效的key
+ */
 
 let keysData = {};
 let currentFileKeys = {};
-
-const filterLocaleList = [
-  'locale',
-  'typing',
-  'api',
-  'api-oceanBase',
-  'api-postgresql',
-  'styles',
-];
-
-for (let i = 0; i < filterLocaleList.length; i++) {
-  filterLocaleList[i] = path.resolve(
-    __dirname,
-    `../src/${filterLocaleList[i]}`
-  );
-}
 
 const getAllParentPath = (path, pathArray) => {
   let key = path.node.key?.name ? path.node.key?.name : path.node.key?.value;
@@ -108,49 +97,10 @@ const getFileLocaleDataByFileName = (fileName, fileSuffix) => {
   getKeysByAst(code, !!fileSuffix ? `${fileName}${fileSuffix}` : fileName);
 };
 
-const getDirAllFile = (dir) => {
-  const allFile = [];
-  getFilePath(dir, allFile);
-  return allFile;
-};
-
-const getFilePath = (dir, allFile) => {
-  const dirFiles = fs.readdirSync(dir);
-  dirFiles.forEach((item) => {
-    const filePath = path.join(dir, item);
-    const current = fs.statSync(filePath);
-    if (
-      current.isDirectory() === true &&
-      !filterLocaleList.includes(filePath)
-    ) {
-      getFilePath(filePath, allFile);
-    }
-    if (
-      current.isFile() === true &&
-      !(
-        filePath.endsWith('.test.tsx') ||
-        filePath.endsWith('.d.ts') ||
-        filePath.endsWith('.type.ts') ||
-        filePath.endsWith('.enum.ts') ||
-        filePath.endsWith('.less') ||
-        filePath.endsWith('.d.tsx') ||
-        filePath.endsWith('.css') ||
-        filePath.endsWith('.svg') ||
-        filePath.endsWith('.md')
-      )
-    ) {
-      allFile.push(filePath);
-    }
-  });
-};
-
 const transformKeys = (directory, filterPath, fileSuffix) => {
   const localeDir = path.resolve(directory);
   const localeFilterPath = path.resolve(filterPath);
-  // const localeFilePath = [
-  //   'D:\\actionCode\\umc-ui\\src\\locale\\en-language\\tidb.ts',
-  // ];
-  const localeFilePath = getDirAllFile(localeDir).filter(
+  const localeFilePath = getAllFilePathUsedI18nT('useless', localeDir).filter(
     (item) => item !== localeFilterPath
   );
   localeFilePath.forEach((item) =>
@@ -183,9 +133,7 @@ const getNodeTypeAndData = (fileName, argument = [], pa) => {
 };
 
 const filterUselessLocale = () => {
-  const allFileDirectory = getDirAllFile(path.resolve('./src')).filter(
-    (item) => !filterLocaleList.includes(item)
-  );
+  const allFileDirectory = getAllFilePathUsedI18nT('useless');
   allFileDirectory.forEach((fileName) => {
     const current = fs.statSync(fileName);
     if (current.isFile() === true) {
